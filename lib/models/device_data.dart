@@ -16,13 +16,20 @@ class DeviceData {
   });
 
   factory DeviceData.fromJson(Map<String, dynamic> json) {
-    return DeviceData(
+    // Imprimir los datos JSON antes de la conversión
+    print('JSON data before conversion to DeviceData: $json');
+
+    final deviceData = DeviceData(
       deviceID: json['deviceID'],
       runTime: json['RunTime'],
       temperature: (json['Temperature'] as num).toDouble(),
       setPoint: (json['SetPoint'] as num).toDouble(),
       gps: GPSData.fromJson(json['GPS']),
     );
+
+    // Imprimir los datos después de la conversión a DeviceData
+    print('Converted DeviceData object: $deviceData');
+    return deviceData;
   }
 }
 
@@ -50,8 +57,11 @@ class GPSData {
   });
 
   factory GPSData.fromJson(Map<String, dynamic> json) {
-    return GPSData(
-      enabled: json['Enabled'] == 1,
+    // Imprimir los datos JSON de GPS antes de la conversión
+    print('JSON data before conversion to GPSData: $json');
+
+    final gpsData = GPSData(
+      enabled: json['Enabled'] == true, // Ajuste para booleano
       latitude: (json['Latitude'] as num).toDouble(),
       longitude: (json['Longitude'] as num).toDouble(),
       speed: (json['Speed'] as num).toDouble(),
@@ -61,5 +71,9 @@ class GPSData {
       accuracy: (json['Accuracy'] as num).toDouble(),
       mapLink: json['MapLink'],
     );
+
+    // Imprimir los datos después de la conversión a GPSData
+    print('Converted GPSData object: $gpsData');
+    return gpsData;
   }
 }

@@ -12,81 +12,155 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController userIdController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  bool isLoading = false;
-  String? errorMessage;
+  final TextEditingController _userIdController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
-  void _login() async {
-    final userId = userIdController.text.trim();
-    final password = passwordController.text.trim();
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  String? _errorMessage;
 
-    if (userId.isEmpty || password.isEmpty) {
-      setState(() {
-        errorMessage = 'Por favor, ingresa tus credenciales.';
-      });
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
+    final userId = _userIdController.text.trim();
+    final password = _passwordController.text.trim();
     setState(() {
-      isLoading = true;
-      errorMessage = null;
+      _isLoading = true;
+      _errorMessage = null;
     });
 
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final token = await authService.loginUser(userId, password);
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context,
+          listen: false); // Obtén authProvider
+      final token = await authService.loginUser(
+          userId, password, authProvider); // Pasa authProvider como argumento
 
-    setState(() {
-      isLoading = false;
-    });
-
-    if (token != null) {
-      // Cargar el token en AuthProvider
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.loadToken();
-
-      // Redirigir a la pantalla del mapa
-      Navigator.pushReplacementNamed(context, '/map');
-    } else {
+      if (token != null) {
+        await authProvider.loadToken();
+        Navigator.pushReplacementNamed(context, '/map');
+      } else {
+        setState(() {
+          _errorMessage = 'Credenciales inválidas o error en el servidor.';
+        });
+      }
+    } catch (e) {
       setState(() {
-        errorMessage = 'Credenciales inválidas o error en el servidor.';
+        _errorMessage = 'Ocurrió un error. Por favor, intenta de nuevo.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
 
+  Widget _buildLoginForm(double screenHeight) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 200.0,
+            height: 200.0,
+            child: Image.asset('assets/thermoLogo.png'),
+          ),
+          SizedBox(height: screenHeight * 0.05),
+          TextFormField(
+            controller: _userIdController,
+            decoration: InputDecoration(
+              labelText: 'User ID',
+              prefixIcon: Icon(Icons.person),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Por favor, ingresa tu User ID.';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 20),
+          TextFormField(
+            controller: _passwordController,
+            decoration: InputDecoration(
+              labelText: 'Contraseña',
+              prefixIcon: Icon(Icons.lock),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+            ),
+            obscureText: true,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Por favor, ingresa tu contraseña.';
+              }
+              return null;
+            },
+          ),
+          SizedBox(height: 20),
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10.0),
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: _isLoading
+                ? Center(child: CircularProgressIndicator())
+                : ElevatedButton(
+                    onPressed: _login,
+                    child: Text(
+                      'Iniciar Sesión',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 5,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final screenHeight = mediaQuery.size.height;
+    final screenWidth = mediaQuery.size.width;
+
     return Scaffold(
-        appBar: AppBar(title: Text('Iniciar Sesión')),
-        body: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              TextField(
-                controller: userIdController,
-                decoration: InputDecoration(labelText: 'User ID'),
-              ),
-              SizedBox(height: 10),
-              TextField(
-                controller: passwordController,
-                decoration: InputDecoration(labelText: 'Contraseña'),
-                obscureText: true,
-              ),
-              SizedBox(height: 20),
-              if (errorMessage != null)
-                Text(
-                  errorMessage!,
-                  style: TextStyle(color: Colors.red),
-                ),
-              SizedBox(height: 20),
-              isLoading
-                  ? CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _login,
-                      child: Text('Iniciar Sesión'),
-                    ),
-            ],
+      resizeToAvoidBottomInset: true,
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 24.0),
+              width: screenWidth,
+              height: screenHeight -
+                  mediaQuery.padding.top -
+                  mediaQuery.padding.bottom,
+              child: _buildLoginForm(screenHeight),
+            ),
           ),
-        ));
+        ),
+      ),
+    );
   }
 }

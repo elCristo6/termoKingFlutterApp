@@ -8,49 +8,58 @@ import 'auth_provider.dart';
 
 class DataProvider with ChangeNotifier {
   WebSocketService? _webSocketService;
-  List<Map<String, dynamic>> _deviceData = [];
-  bool _isDisposed = false; // Añadir esta línea
+  final List<Map<String, dynamic>> _deviceData = [];
+  bool _isDisposed = false;
+  bool _isDeviceActive = false;
+  AuthProvider? authProvider;
 
+  bool get isDeviceActive => _isDeviceActive;
   List<Map<String, dynamic>> get deviceData => _deviceData;
 
   void initialize(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.isAuthenticated && authProvider.token != null) {
-      print('DataProvider: Inicializando WebSocketService con token.');
+    authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider!.isAuthenticated && authProvider!.token != null) {
+      print('DataProvider: Inicializando WebSocketService con token y userId.');
       _webSocketService = WebSocketService(
         onDataReceived: (data) =>
-            _handleDataReceived(data, authProvider.userId),
+            _handleDataReceived(data, authProvider!.userId!), // Usa userId aquí
+        deviceID: authProvider!.userId!, // Usa userId en lugar de deviceID
       );
-      _webSocketService!.connect(authProvider.token!);
+      _webSocketService!.connect(authProvider!.token!);
     } else {
-      print('DataProvider: Usuario no autenticado o token nulo.');
+      print('DataProvider: Usuario no autenticado o userId no disponible.');
     }
   }
 
   void _handleDataReceived(Map<String, dynamic> data, String userId) {
-    if (_isDisposed) return; // Añadir esta línea
+    if (_isDisposed) return;
 
     print('DataProvider: Datos recibidos: $data');
-    // Verificar si el userId en los datos coincide con el userId autenticado
-    if (data['userId'] == userId) {
+    final receivedUserId = data['userId'];
+    print(
+        'DataProvider: Comparando userId: esperado=$userId, recibido=$receivedUserId');
+
+    if (receivedUserId == userId) {
       print('DataProvider: Datos pertenecen al usuario autenticado.');
       _deviceData.add(data);
       notifyListeners();
     } else {
-      print(
-          'DataProvider: Datos recibidos para otro usuario: ${data['userId']}');
+      print('DataProvider: Mensaje recibido para otro usuario.');
     }
   }
 
   void setSetPoint(double setPoint) {
     print('DataProvider: Enviando setPoint: $setPoint°C');
-    // Enviar el setPoint al backend a través del WebSocket
     if (_webSocketService != null && _webSocketService!.isConnected) {
       _webSocketService!.sendTemperatureCommand(setPoint);
     } else {
-      print(
-          'DataProvider: WebSocketService no está inicializado o no está conectado.');
+      print('DataProvider: WebSocketService no está conectado.');
     }
+  }
+
+  void requestDeviceStatus() {
+    print('DataProvider: Solicitando estado del dispositivo.');
+    _webSocketService?.requestDeviceStatus();
   }
 
   void disconnect() {
@@ -60,7 +69,7 @@ class DataProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    _isDisposed = true; // Añadir esta línea
+    _isDisposed = true;
     print('DataProvider: Destruyendo y cerrando WebSocket.');
     _webSocketService?.disconnect();
     super.dispose();

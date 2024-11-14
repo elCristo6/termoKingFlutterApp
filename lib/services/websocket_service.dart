@@ -1,9 +1,8 @@
 // lib/services/websocket_service.dart
 
-import 'dart:async'; // Añadir esta importación
+import 'dart:async';
 import 'dart:convert';
 
-import 'package:web_socket_channel/status.dart' as status;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 typedef OnDataReceived = void Function(Map<String, dynamic> data);
@@ -11,20 +10,21 @@ typedef OnDataReceived = void Function(Map<String, dynamic> data);
 class WebSocketService {
   WebSocketChannel? _channel;
   final OnDataReceived onDataReceived;
+  final String deviceID;
   bool _isConnected = false;
-  StreamSubscription? _subscription; // Añadir esta línea
+  StreamSubscription? _subscription;
 
-  WebSocketService({required this.onDataReceived});
+  WebSocketService({required this.onDataReceived, required this.deviceID});
 
   void connect(String token) {
     if (_isConnected) {
       print('WebSocketService: Ya está conectado.');
       return;
     }
-    print('WebSocketService: Intentando conectar con token.');
-    // Reemplaza 'localhost' con la dirección de tu servidor si es necesario
+
+    print('WebSocketService: Conectando con token y deviceID.');
     _channel = WebSocketChannel.connect(
-      Uri.parse('ws://localhost:3000/?token=$token'),
+      Uri.parse('ws://34.226.208.66:3002/?token=$token&deviceID=$deviceID'),
     );
 
     _subscription = _channel!.stream.listen(
@@ -32,9 +32,13 @@ class WebSocketService {
         print('WebSocketService: Mensaje recibido: $message');
         try {
           final data = jsonDecode(message);
-          onDataReceived(data);
+          if (data['deviceID'] == deviceID) {
+            onDataReceived(data);
+          } else {
+            print('WebSocketService: Mensaje recibido para otro dispositivo.');
+          }
         } catch (e) {
-          print('WebSocketService: Error al decodificar mensaje JSON: $e');
+          print('WebSocketService: Error al decodificar JSON: $e');
         }
       },
       onError: (error) {
@@ -42,9 +46,9 @@ class WebSocketService {
         _isConnected = false;
       },
       onDone: () {
-        print('WebSocketService: Conexión WebSocket cerrada.');
+        print('WebSocketService: Conexión cerrada.');
         _isConnected = false;
-        _subscription?.cancel(); // Cancelar la suscripción
+        _subscription?.cancel();
       },
     );
 
@@ -65,12 +69,25 @@ class WebSocketService {
     }
   }
 
+  void requestDeviceStatus() {
+    if (_channel != null && _isConnected) {
+      final request = {
+        'command': 'requestStatus',
+      };
+      _channel!.sink.add(jsonEncode(request));
+      print('WebSocketService: Solicitud de estado del dispositivo enviada.');
+    } else {
+      print(
+          'WebSocketService: No se puede solicitar estado, WebSocket no está conectado.');
+    }
+  }
+
   void disconnect() {
     if (_channel != null) {
       print('WebSocketService: Cerrando conexión WebSocket.');
-      _channel!.sink.close(status.goingAway);
+      _channel!.sink.close();
       _isConnected = false;
-      _subscription?.cancel(); // Cancelar la suscripción
+      _subscription?.cancel();
     }
   }
 
